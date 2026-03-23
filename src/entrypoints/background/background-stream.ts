@@ -15,7 +15,7 @@ import type {
   ThinkingSnapshot,
 } from "@/types/background-stream"
 import { Output, streamText } from "ai"
-import { z } from "zod"
+import { fromJSONSchema, z } from "zod"
 import { BACKGROUND_STREAM_PORTS } from "@/types/background-stream"
 import { extractAISDKErrorMessage } from "@/utils/error/extract-message"
 import { logger } from "@/utils/logger"
@@ -33,29 +33,13 @@ const streamTextPayloadSchema = z.object({
   providerId: z.string().trim().min(1),
 }).loose()
 
-const structuredObjectFieldSchema = z.object({
-  name: z.string().trim().min(1),
-  type: z.enum(["string", "number"]),
-})
-
 const structuredObjectPayloadSchema = z.object({
   providerId: z.string().trim().min(1),
-  outputSchema: z.array(structuredObjectFieldSchema).min(1),
-}).loose().superRefine((payload, ctx) => {
-  const nameSet = new Set<string>()
-
-  payload.outputSchema.forEach((field, index) => {
-    if (nameSet.has(field.name)) {
-      ctx.addIssue({
-        code: "custom",
-        message: `Duplicate output schema name "${field.name}".`,
-        path: ["outputSchema", index, "name"],
-      })
-      return
-    }
-    nameSet.add(field.name)
-  })
-})
+  outputSchema: z.object({
+    type: z.literal("object"),
+    properties: z.record(z.string(), z.unknown()),
+  }).loose(),
+}).loose()
 
 function createStartMessageParser<TSerializablePayload>(payloadSchema: z.ZodTypeAny) {
   return (msg: unknown): StartMessageParseResult<TSerializablePayload> => {
@@ -309,22 +293,10 @@ export async function runStructuredObjectStreamInBackground(
     text: "",
   }
 
-  const fieldTypeToZodSchema: Record<string, z.ZodTypeAny> = {
-    string: z.string().nullable(),
-    number: z.number().nullable(),
-  }
-
-  const schemaShape: Record<string, z.ZodTypeAny> = {}
-  for (const field of outputSchema) {
-    schemaShape[field.name] = fieldTypeToZodSchema[field.type] ?? z.string().nullable()
-  }
-
   const result = streamText({
     ...(streamParams as Parameters<typeof streamText>[0]),
     model,
-    output: Output.object({
-      schema: z.object(schemaShape).strict(),
-    }),
+    output: Output.object({ schema: fromJSONSchema(outputSchema) }),
     abortSignal: signal,
     onError: ({ error }) => {
       onError?.(error)

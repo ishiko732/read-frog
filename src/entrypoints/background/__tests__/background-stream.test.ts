@@ -1,5 +1,7 @@
 import type { BackgroundStructuredObjectStreamSnapshot } from "@/types/background-stream"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { toJSONSchema } from "zod"
+import { buildOutputZodSchema } from "@/utils/content-script/build-output-zod-schema"
 
 const streamTextMock = vi.fn()
 const outputObjectMock = vi.fn((params: Record<string, unknown>) => params)
@@ -104,10 +106,10 @@ describe("background-stream", () => {
       {
         providerId: "openai-default",
         prompt: "Analyze selection",
-        outputSchema: [
+        outputSchema: toJSONSchema(buildOutputZodSchema([
           { name: "score", type: "number" },
           { name: "summary", type: "string" },
-        ],
+        ])),
       },
       {
         onChunk: (snapshot) => {
@@ -336,27 +338,6 @@ describe("background-stream", () => {
       error: { message: "Invalid stream start payload" },
     })
     expect(emptySchemaPort.disconnect).toHaveBeenCalledTimes(1)
-
-    const duplicateKeyPort = createMockPort("stream-structured-object")
-    handleStreamStructuredObjectPort(duplicateKeyPort.port as never)
-    await duplicateKeyPort.emitMessage({
-      type: "start",
-      requestId: "req-structured-duplicate",
-      payload: {
-        providerId: "openai-default",
-        outputSchema: [
-          { name: "score ", type: "number" },
-          { name: "score", type: "string" },
-        ],
-      },
-    })
-
-    expect(duplicateKeyPort.postMessage).toHaveBeenCalledWith({
-      type: "error",
-      requestId: "req-structured-duplicate",
-      error: { message: "Invalid stream start payload" },
-    })
-    expect(duplicateKeyPort.disconnect).toHaveBeenCalledTimes(1)
   })
 
   it("disconnects invalid start message without requestId and cannot post error", async () => {

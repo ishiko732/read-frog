@@ -1,6 +1,6 @@
 import type { Browser } from "#imports"
 import type { JSONValue, StreamTextOnErrorCallback } from "ai"
-import type { SelectionToolbarCustomActionOutputType } from "@/types/config/selection-toolbar"
+import type { z } from "zod"
 
 interface BaseBackgroundStreamSerializablePayload {
   providerId: string
@@ -19,11 +19,6 @@ interface BaseBackgroundStreamSerializablePayload {
 
 export type BackgroundStreamTextSerializablePayload = BaseBackgroundStreamSerializablePayload
 
-export interface BackgroundStructuredObjectOutputField {
-  name: string
-  type: SelectionToolbarCustomActionOutputType
-}
-
 export interface ThinkingSnapshot {
   status: "thinking" | "complete"
   text: string
@@ -39,7 +34,7 @@ export type BackgroundTextStreamSnapshot = BackgroundStreamSnapshot<string>
 export type BackgroundStructuredObjectStreamSnapshot = BackgroundStreamSnapshot<Record<string, unknown>>
 
 export type BackgroundStreamStructuredObjectSerializablePayload = BaseBackgroundStreamSerializablePayload & {
-  outputSchema: BackgroundStructuredObjectOutputField[]
+  outputSchema: z.core.JSONSchema.JSONSchema
 }
 
 export const BACKGROUND_STREAM_PORTS = {

@@ -7,10 +7,12 @@ import type { LLMProviderConfig } from "@/types/config/provider"
 import type { SelectionToolbarCustomAction } from "@/types/config/selection-toolbar"
 import { LANG_CODE_TO_EN_NAME } from "@read-frog/definitions"
 import { useCallback, useEffect, useRef, useState } from "react"
+import { z } from "zod"
 import { ANALYTICS_FEATURE } from "@/types/analytics"
 import { isLLMProviderConfig } from "@/types/config/provider"
 import { createFeatureUsageContext, trackFeatureUsed } from "@/utils/analytics"
 import { streamBackgroundStructuredObject } from "@/utils/content-script/background-stream-client"
+import { buildOutputZodSchema } from "@/utils/content-script/build-output-zod-schema"
 import { resolveModelId } from "@/utils/providers/model-id"
 import { getProviderOptionsWithOverride } from "@/utils/providers/options"
 import { truncateContextTextForCustomAction } from "../../utils"
@@ -180,12 +182,13 @@ export function useCustomActionExecution({
       })
 
       try {
+        const outputSchema = z.toJSONSchema(buildOutputZodSchema(action.outputSchema))
         const finalResult = await streamBackgroundStructuredObject(
           {
             providerId: providerConfig.id,
             system: systemPrompt,
             prompt,
-            outputSchema: action.outputSchema.map(({ name, type }) => ({ name, type })),
+            outputSchema,
             providerOptions,
             temperature: providerConfig.temperature,
           },
